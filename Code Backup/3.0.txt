@@ -1,0 +1,235 @@
+import java.awt.Color;
+import java.awt.Image;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.IOException;
+
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
+
+public class CheckersGame extends JFrame {
+    private JButton[][] boardButtons;
+    private int[][] board;
+    private int currentPlayer;
+    private int selectedRow;
+    private int selectedCol;
+
+    public CheckersGame() {
+        setTitle("Checkers Game");
+        setSize(400, 400);
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        initializeBoard();
+        createGUI();
+
+        setLocationRelativeTo(null);
+        setVisible(true);
+    }
+
+    private void initializeBoard() {
+        clearConsole();
+        board = new int[8][8];
+        currentPlayer = 1; // Player 1 starts
+        selectedRow = -1;
+        selectedCol = -1;
+
+        // Initialize the board with pieces
+        for (int i = 0; i < 3; i++) {
+            for (int j = 0; j < 8; j++) {
+                if ((i + j) % 2 != 0) {
+                    board[i][j] = 1; // Player 1's pieces
+                }
+            }
+        }
+
+        for (int i = 5; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                if ((i + j) % 2 != 0) {
+                    board[i][j] = 2; // Player 2's pieces
+                }
+            }
+        }
+    }
+
+    private void createGUI() {
+        setLayout(new java.awt.GridLayout(8, 8));
+        boardButtons = new JButton[8][8];
+
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                boardButtons[i][j] = new JButton();
+                boardButtons[i][j].setBackground((i + j) % 2 == 0 ? Color.WHITE : Color.BLACK);
+                boardButtons[i][j].addActionListener(new BoardButtonListener(i, j));
+                updateButtonIcon(i, j);
+                add(boardButtons[i][j]);
+            }
+        }
+    }
+
+    private void updateButtonIcon(int row, int col) {
+        if (board[row][col] == 1) {
+            boardButtons[row][col].setIcon(createPieceIcon("Red-removebg-preview.png"));
+        } else if (board[row][col] == 2) {
+            boardButtons[row][col].setIcon(createPieceIcon("Black-removebg-preview.png"));
+        } else {
+            boardButtons[row][col].setIcon(null);
+        }
+    }
+
+    private ImageIcon createPieceIcon(String imagePath) {
+        ImageIcon icon = new ImageIcon(imagePath);
+        Image image = icon.getImage().getScaledInstance(50, 50, Image.SCALE_SMOOTH);
+        return new ImageIcon(image);
+    }
+
+    private class BoardButtonListener implements ActionListener {
+        private int row;
+        private int col;
+
+        public BoardButtonListener(int row, int col) {
+            this.row = row;
+            this.col = col;
+        }
+
+        @Override
+        public void actionPerformed(ActionEvent e) {
+            System.out.println("Button Clicked: " + row + ", " + col);
+            if (selectedRow == -1 && selectedCol == -1 && isCurrentPlayerPiece(row, col)) {
+                // No piece selected, so select the clicked piece
+                selectedRow = row;
+                selectedCol = col;
+
+                // Highlight the selected piece
+                boardButtons[selectedRow][selectedCol].setBackground(Color.YELLOW);
+            } else if (selectedRow != -1 && selectedCol != -1 && isValidMove(selectedRow, selectedCol, row, col)) {
+                // A piece is already selected, so attempt to move the piece to the clicked
+                // position
+                // Perform the move
+                System.out.println("Moving from: " + selectedRow + ", " + selectedCol + " to " + row + ", " + col);
+                board[row][col] = board[selectedRow][selectedCol];
+                board[selectedRow][selectedCol] = 0; // Clear the source position
+
+                // Handle capturing (removing) opponent's piece if applicable
+                handleCapture(selectedRow, selectedCol, row, col);
+
+                // Switch the player for the next move
+                currentPlayer = (currentPlayer == 1) ? 2 : 1;
+
+                // Update the GUI after the move
+                updateBoardGUI();
+
+                // Reset the selected piece and remove highlight
+                boardButtons[selectedRow][selectedCol]
+                        .setBackground((selectedRow + selectedCol) % 2 == 0 ? Color.WHITE : Color.BLACK);
+                selectedRow = -1;
+                selectedCol = -1;
+            } else {
+                // Deselect the piece if an invalid move is attempted
+                selectedRow = -1;
+                selectedCol = -1;
+
+                // Remove highlight from the previously selected piece
+                for (int i = 0; i < 8; i++) {
+                    for (int j = 0; j < 8; j++) {
+                        boardButtons[i][j]
+                                .setBackground((i + j) % 2 == 0 ? Color.WHITE : Color.BLACK);
+                    }
+                }
+            }
+        }
+
+        private boolean isCurrentPlayerPiece(int row, int col) {
+            return board[row][col] == currentPlayer;
+        }
+
+        private boolean isValidMove(int fromRow, int fromCol, int toRow, int toCol) {
+            // Implement logic to check if the move is valid
+            // For simplicity, we'll start with basic bounds checking
+            if (toRow < 0 || toRow >= 8 || toCol < 0 || toCol >= 8) {
+                System.out.println("Invalid move: Out of bounds");
+                return false; // Move is out of bounds
+            }
+
+            // Ensure the destination is an empty square
+            if (board[toRow][toCol] != 0) {
+                System.out.println("Invalid move: Destination is not empty");
+                return false; // Destination is not empty
+            }
+
+            // Regular pieces move forward only (for player 1, move downward; for player 2,
+            // move upward)
+            int direction = (currentPlayer == 1) ? 1 : -1;
+            if (toRow != fromRow + direction || Math.abs(toCol - fromCol) != 1) {
+                System.out.println("Invalid move: Incorrect move for a regular piece");
+                return false; // Invalid move for a regular piece
+            }
+
+            // Check if capturing is valid (only allowed diagonally)
+            if (Math.abs(toRow - fromRow) == 2 && Math.abs(toCol - fromCol) == 2) {
+                // Determine the position of the captured piece
+                int capturedRow = (fromRow + toRow) / 2;
+                int capturedCol = (fromCol + toCol) / 2;
+
+                // Check if the captured piece belongs to the opponent
+                if (board[capturedRow][capturedCol] == getOpponentPlayer()) {
+                    // Valid capturing move
+                    board[capturedRow][capturedCol] = 0;
+                    System.out.println("Captured opponent's piece at: " + capturedRow + ", " + capturedCol);
+                    return true;
+                } else {
+                    System.out.println("Invalid move: Cannot capture own piece");
+                    return false; // Attempting to capture own piece
+                }
+            }
+
+            return true; // Regular move
+        }
+
+        private int getOpponentPlayer() {
+            return (currentPlayer == 1) ? 2 : 1;
+        }
+
+        private void handleCapture(int fromRow, int fromCol, int toRow, int toCol) {
+            // Check if capturing is valid (only allowed diagonally)
+            if (Math.abs(toRow - fromRow) == 2 && Math.abs(toCol - fromCol) == 2) {
+                // Determine the position of the captured piece
+                int capturedRow = (fromRow + toRow) / 2;
+                int capturedCol = (fromCol + toCol) / 2;
+
+                // Remove the captured piece
+                board[capturedRow][capturedCol] = 0;
+                System.out.println("Captured opponent's piece at: " + capturedRow + ", " + capturedCol);
+            }
+        }
+    }
+
+    private void updateBoardGUI() {
+        // Update the graphical representation of the board after a move
+        for (int i = 0; i < 8; i++) {
+            for (int j = 0; j < 8; j++) {
+                updateButtonIcon(i, j);
+            }
+        }
+    }
+
+    public static void clearConsole() {
+        try {
+            if (System.getProperty("os.name").contains("Windows")) {
+                new ProcessBuilder("cmd", "/c", "cls").inheritIO().start().waitFor();
+            } else {
+                System.out.print("\033[H\033[2J");
+                System.out.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> new CheckersGame());
+    }
+}
